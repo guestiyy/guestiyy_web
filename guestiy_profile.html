@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guestiy | Sistem Terminali</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;500;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --green: #00ff41;
+            --green-dim: rgba(0, 255, 65, 0.18);
+            --green-glow: rgba(0, 255, 65, 0.5);
+            --bg: #000;
+            --card-bg: rgba(4, 12, 8, 0.35);
+            --border: rgba(0, 255, 65, 0.25);
+            --text: #d6eddd;
+            --text-dim: #7fa88a;
+        }
+
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
+            user-select: none; cursor: none !important;
+        }
+
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex; justify-content: center; align-items: center;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text);
+            overflow: hidden;
+            perspective: 1400px;
+        }
+
+        /* ── CURSOR ── */
+        .cursor-dot {
+            position: fixed; top: 0; left: 0;
+            width: 5px; height: 5px;
+            background: var(--green); border-radius: 50%;
+            z-index: 9999; pointer-events: none;
+            box-shadow: 0 0 8px var(--green), 0 0 20px var(--green);
+            will-change: transform;
+        }
+        .cursor-ring {
+            position: fixed; top: 0; left: 0;
+            width: 36px; height: 36px;
+            border: 1.5px solid rgba(0,255,65,0.55);
+            border-radius: 50%; z-index: 9998; pointer-events: none;
+            will-change: transform;
+            transition: width .18s, height .18s, border-color .18s, background .18s;
+        }
+        body.hovering .cursor-dot { transform-origin: center; filter: brightness(1.8); }
+        body.hovering .cursor-ring { width: 54px; height: 54px; border-color: var(--green); background: rgba(0,255,65,.12); }
+
+        @media (max-width: 768px) {
+            * { cursor: auto !important; }
+            .cursor-dot, .cursor-ring { display: none !important; }
+        }
+
+        /* ── MATRIX CANVAS ── */
+        #matrix-canvas {
+            position: fixed; inset: 0; z-index: 0;
+            opacity: .55;
+        }
+
+        /* ── SCAN LINES ── */
+        .crt-overlay {
+            position: fixed; inset: 0; z-index: 8990; pointer-events: none;
+            background:
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.18) 2px, rgba(0,0,0,.18) 4px);
+        }
+
+        /* ── VIGNETTE ── */
+        .vignette {
+            position: fixed; inset: 0; z-index: 8991; pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.8) 100%);
+        }
+
+        /* ── CARD ── */
+        .glass-card {
+            position: relative; z-index: 10;
+            width: 100%; max-width: 420px;
+            max-height: 90vh;
+            display: flex; flex-direction: column;
+            background: var(--card-bg);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--border);
+            border-top-color: rgba(0,255,65,.55);
+            border-radius: 20px;
+            box-shadow:
+                0 0 0 1px rgba(0,255,65,.06),
+                0 24px 60px rgba(0,0,0,.85),
+                inset 0 0 40px rgba(0,255,65,.08);
+            transform-style: preserve-3d;
+            transition: transform .1s linear;
+            overflow: hidden;
+        }
+
+        /* corner accents */
+        .glass-card::before, .glass-card::after {
+            content: ''; position: absolute; width: 18px; height: 18px;
+            border-color: var(--green); border-style: solid;
+            z-index: 20; pointer-events: none;
+        }
+        .glass-card::before { top: 10px; left: 10px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+        .glass-card::after  { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+
+        /* ── BANNER ── */
+        .banner {
+            flex-shrink: 0;
+            height: 130px;
+            position: relative; overflow: hidden;
+            background:
+                linear-gradient(rgba(0,255,65,.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,65,.12) 1px, transparent 1px),
+                linear-gradient(160deg, rgba(0,40,15,1) 0%, rgba(0,10,5,1) 100%);
+            background-size: 22px 22px, 22px 22px, 100% 100%;
+        }
+
+        /* perspective grid */
+        .banner-grid {
+            position: absolute; inset: 0;
+            background: linear-gradient(rgba(0,255,65,.07) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,255,65,.07) 1px, transparent 1px);
+            background-size: 32px 32px;
+            transform: perspective(400px) rotateX(35deg) scaleX(1.5) translateY(40%);
+            transform-origin: bottom center;
+        }
+
+        /* scanline sweep */
+        .banner::after {
+            content: '';
+            position: absolute; top: -60%; left: 0;
+            width: 100%; height: 40%;
+            background: linear-gradient(to bottom, transparent, rgba(0,255,65,.45), transparent);
+            animation: scanLine 3.5s linear infinite;
+        }
+
+        /* bottom glow line */
+        .banner-line {
+            position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--green) 40%, #fff 50%, var(--green) 60%, transparent 100%);
+            box-shadow: 0 0 18px var(--green), 0 0 6px #fff;
+        }
+
+        /* terminal tag */
+        .banner-tag {
+            position: absolute; top: 14px; left: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px; font-weight: 600;
+            color: var(--green); letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--green);
+            opacity: .75;
+        }
+
+        @keyframes scanLine { 0%{top:-60%} 100%{top:140%} }
+
+        /* ── PROFILE TOP ── */
+        .profile-top {
+            flex-shrink: 0;
+            padding: 0 22px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-top: -62px;
+            position: relative; z-index: 5;
+        }
+
+        /* avatar */
+        .avatar-container {
+            width: 120px; height: 120px;
+            position: relative;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .avatar-ring-outer {
+            position: absolute; inset: 0; border-radius: 50%;
+            border: 1px dashed rgba(0,255,65,.6);
+            animation: spinCW 6s linear infinite;
+        }
+        .avatar-ring-inner {
+            position: absolute; inset: 7px; border-radius: 50%;
+            border: 1px dashed rgba(0,255,65,.3);
+            animation: spinCCW 4s linear infinite;
+        }
+        @keyframes spinCW  { to { transform: rotate(360deg); } }
+        @keyframes spinCCW { to { transform: rotate(-360deg); } }
+
+        .avatar {
+            width: 100px; height: 100px; border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #000;
+            background: #060d08;
+            position: relative; z-index: 2;
+            box-shadow: 0 0 25px rgba(0,255,65,.25);
+            transition: transform .45s cubic-bezier(.175,.885,.32,1.275), box-shadow .45s;
+        }
+        .glass-card:hover .avatar {
+            transform: scale(1.09) rotate(4deg);
+            box-shadow: 0 0 40px rgba(0,255,65,.6);
+        }
+
+        .status-dot {
+            position: absolute; bottom: 8px; right: 8px;
+            width: 20px; height: 20px;
+            background: var(--green); border-radius: 50%;
+            border: 3px solid #000;
+            box-shadow: 0 0 14px var(--green);
+            z-index: 4;
+            animation: pulseDot 1.8s infinite;
+        }
+        @keyframes pulseDot {
+            0%   { box-shadow: 0 0 0 0 rgba(0,255,65,.8); }
+            70%  { box-shadow: 0 0 0 12px rgba(0,255,65,0); }
+            100% { box-shadow: 0 0 0 0 rgba(0,255,65,0); }
+        }
+
+        /* badges */
+        .badges {
+            display: flex; gap: 10px; align-items: center;
+            background: rgba(0,0,0,.55);
+            padding: 9px 14px; border-radius: 12px;
+            border: 1px solid rgba(0,255,65,.25);
+            margin-bottom: 14px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 24px rgba(0,0,0,.5);
+        }
+        .badges i {
+            font-size: 15px; color: var(--green);
+            filter: drop-shadow(0 0 5px rgba(0,255,65,.8));
+            transition: transform .2s;
+        }
+        .badges i:hover { transform: scale(1.3); }
+
+        /* ── SCROLLABLE CONTENT ── */
+        .content {
+            padding: 12px 22px 24px;
+            overflow-y: auto; flex-grow: 1;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0,255,65,.5) transparent;
+        }
+        .content::-webkit-scrollbar { width: 4px; }
+        .content::-webkit-scrollbar-track { background: transparent; }
+        .content::-webkit-scrollbar-thumb { background: rgba(0,255,65,.4); border-radius: 10px; }
+
+        /* ── NAME ── */
+        .name-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+
+        .name-tag h1 {
+            font-family: 'Oxanium', sans-serif;
+            font-size: 30px; font-weight: 800;
+            color: #fff; letter-spacing: -0.5px;
+            text-shadow: 0 0 18px rgba(0,255,65,.4);
+            transition: .2s;
+        }
+        .name-tag h1:hover {
+            color: var(--green);
+            text-shadow: -2px 0 rgba(255,0,0,.6), 2px 0 rgba(0,100,255,.6);
+            animation: glitch .35s both infinite;
+        }
+        @keyframes glitch {
+            0%  { transform: translate(0); }
+            20% { transform: translate(-2px, 1px); }
+            40% { transform: translate(-2px, -1px); }
+            60% { transform: translate(2px, 1px); }
+            80% { transform: translate(2px, -1px); }
+            100%{ transform: translate(0); }
+        }
+        .name-tag .handle { font-size: 14px; color: var(--green); font-weight: 500; opacity: .85; }
+
+        .real-name {
+            font-size: 11px; color: var(--text-dim);
+            letter-spacing: 2.5px; text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        /* ── BIO ── */
+        .bio {
+            font-size: 13px; color: var(--text); line-height: 1.7;
+            margin-bottom: 22px;
+            padding: 10px 14px;
+            background: linear-gradient(90deg, rgba(0,255,65,.12), transparent);
+            border-left: 2px solid var(--green);
+            border-radius: 0 8px 8px 0;
+            box-shadow: inset 2px 0 0 var(--green);
+        }
+
+        /* ── SECTION HEADER ── */
+        .section-title {
+            font-family: 'Oxanium', sans-serif;
+            font-size: 10px; color: var(--green);
+            font-weight: 700; letter-spacing: 3px;
+            text-transform: uppercase; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .section-title::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, rgba(0,255,65,.3), transparent);
+        }
+
+        /* ── SKILLS ── */
+        .skills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+
+        .skill-btn {
+            background: rgba(0,0,0,.45);
+            border: 1px solid rgba(0,255,65,.22);
+            color: var(--text); padding: 7px 13px; border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; font-weight: 600;
+            display: flex; align-items: center; gap: 7px;
+            backdrop-filter: blur(6px);
+            opacity: 0; transform: translateY(16px);
+            animation: fadeUp .5s ease forwards;
+            animation-delay: calc(var(--i) * .08s);
+            transition: background .25s, border-color .25s, transform .25s, box-shadow .25s, color .25s;
+        }
+        .skill-btn i { color: var(--green); font-size: 13px; }
+        .skill-btn:hover {
+            background: rgba(0,255,65,.2);
+            border-color: var(--green);
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 8px 24px rgba(0,255,65,.3);
+            color: #fff;
+        }
+
+        /* ── PROJECTS ── */
+        .projects { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+
+        .project-item {
+            background: rgba(0,0,0,.42);
+            border: 1px solid rgba(0,255,65,.16);
+            padding: 14px 16px; border-radius: 12px;
+            display: flex; align-items: flex-start; gap: 14px;
+            position: relative; overflow: hidden;
+            backdrop-filter: blur(6px);
+            opacity: 0; transform: translateY(16px);
+            animation: fadeUp .5s ease forwards;
+            animation-delay: calc(var(--i) * .1s);
+            transition: border-color .3s, background .3s, padding-left .3s, box-shadow .3s;
+        }
+        .project-item::before {
+            content: ''; position: absolute; left: 0; top: 0;
+            width: 3px; height: 100%;
+            background: var(--green);
+            transform: scaleY(0); transition: transform .3s;
+            box-shadow: 0 0 12px var(--green);
+        }
+        .project-item:hover {
+            border-color: rgba(0,255,65,.5);
+            background: rgba(0,255,65,.12);
+            padding-left: 20px;
+            box-shadow: 0 0 30px rgba(0,255,65,.15);
+        }
+        .project-item:hover::before { transform: scaleY(1); }
+
+        .project-item > i { color: var(--green); font-size: 20px; margin-top: 2px; flex-shrink: 0; }
+        .project-info h4 {
+            font-family: 'Oxanium', sans-serif;
+            font-size: 15px; color: #fff; margin-bottom: 4px;
+        }
+        .project-info p { font-size: 11px; color: #98bca6; line-height: 1.6; }
+
+        /* ── STATS ── */
+        .stats-container {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,.65);
+            padding: 14px 18px; border-radius: 12px;
+            border: 1px solid rgba(0,255,65,.4);
+            box-shadow: 0 0 30px rgba(0,255,65,.2), inset 0 0 20px rgba(0,255,65,.1);
+            position: relative; overflow: hidden;
+            backdrop-filter: blur(12px);
+            opacity: 0; transform: translateY(16px);
+            animation: fadeUp .5s ease forwards; animation-delay: .7s;
+        }
+        .stats-container::after {
+            content: ''; position: absolute; top: 0; left: -100%;
+            width: 55%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0,255,65,.35), transparent);
+            animation: radarSweep 2.8s linear infinite;
+        }
+        @keyframes radarSweep { to { left: 160%; } }
+
+        .stat-text {
+            font-size: 12px; font-weight: 700; color: var(--green);
+            display: flex; align-items: center; gap: 8px;
+            z-index: 2; letter-spacing: 1.5px;
+        }
+        .stat-text i {
+            font-size: 16px;
+            filter: drop-shadow(0 0 6px var(--green));
+            animation: blinkEye 5s infinite;
+        }
+        @keyframes blinkEye {
+            0%,96%,100% { transform: scaleY(1); }
+            97%          { transform: scaleY(0.05); }
+        }
+        .stats-container img {
+            z-index: 2; height: 30px;
+            filter: hue-rotate(90deg) brightness(1.5) drop-shadow(0 0 6px rgba(0,255,65,.5));
+        }
+
+        /* ── PLAY HINT ── */
+        .play-hint {
+            position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+            font-family: 'Oxanium', sans-serif;
+            font-size: 11px; font-weight: 700; letter-spacing: 2px;
+            color: #000; background: var(--green);
+            padding: 10px 24px; border-radius: 30px;
+            box-shadow: 0 0 30px rgba(0,255,65,.8);
+            animation: pulseHint 2s infinite;
+            pointer-events: none; z-index: 9999;
+        }
+        @keyframes pulseHint {
+            0%,100% { opacity: .7; transform: translateX(-50%) scale(1); }
+            50%     { opacity: 1;  transform: translateX(-50%) scale(1.05); }
+        }
+
+        /* ── SHARED ANIMATIONS ── */
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        /* ── MOBILE ── */
+        @media (max-width: 450px) {
+            .glass-card {
+                border-radius: 0; border: none;
+                max-height: 100vh;
+                transform: none !important;
+            }
+            body { padding: 0; perspective: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="cursor-dot"></div>
+<div class="cursor-ring"></div>
+<div class="crt-overlay"></div>
+<div class="vignette"></div>
+<canvas id="matrix-canvas"></canvas>
+
+<div class="play-hint" id="playHint"><i class="fa-solid fa-fingerprint"></i> &nbsp;Devam etmek için tıkla</div>
+
+<div class="glass-card" id="tilt-card">
+    <div class="banner">
+        <div class="banner-grid"></div>
+        <span class="banner-tag">//</span>
+        <div class="banner-line"></div>
+    </div>
+
+    <div class="profile-top">
+        <div class="avatar-container hover-target">
+            <div class="avatar-ring-outer"></div>
+            <div class="avatar-ring-inner"></div>
+            <!-- Google Drive avatar - thumbnail format daha güvenilir -->
+            <img class="avatar"
+                 src="https://drive.google.com/thumbnail?id=15C6v1oIa0jnsQ__uVNn70bVjuF7ri1w7&sz=w400"
+                 alt="Guestiy Avatar"
+                 onerror="this.src='https://ui-avatars.com/api/?name=G&background=001a0a&color=00ff41&size=200&bold=true&font-size=0.5'">
+            <div class="status-dot"></div>
+        </div>
+        <div class="badges hover-target">
+            <i class="fa-solid fa-microchip" title="Sistem Uzmanı"></i>
+            <i class="fa-solid fa-shield-halved" title="Güvenlik"></i>
+            <i class="fa-brands fa-discord" title="Discord"></i>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="name-tag hover-target">
+            <h1>Guestiyy</h1>
+            <span class="handle">@anonim_x</span>
+        </div>
+        <div class="real-name">// Samet</div>
+
+        <div class="bio">
+            Merhaba, ben Samet. Siber güvenlik, kodlama ve sistem yönetimi alanlarına derin bir ilgi duyuyorum.
+            Bu alanlarda kendimi geliştirmeye, projeler üretmeye ve sürekli öğrenmeye odaklanmış bir teknoloji meraklısıyım.
+        </div>
+
+        <div class="section-title">Uzmanlık & Yetenekler</div>
+        <div class="skills">
+            <div class="skill-btn hover-target" style="--i:1;"><i class="fa-brands fa-python"></i> Python</div>
+            <div class="skill-btn hover-target" style="--i:2;"><i class="fa-solid fa-c"></i> C++</div>
+            <div class="skill-btn hover-target" style="--i:3;"><i class="fa-solid fa-server"></i> Sunucu Yönetimi</div>
+            <div class="skill-btn hover-target" style="--i:4;"><i class="fa-solid fa-shield-virus"></i> Siber Güvenlik</div>
+        </div>
+
+        <div class="section-title">Aktif Projeler</div>
+        <div class="projects">
+            <div class="project-item hover-target" style="--i:5;">
+                <i class="fa-solid fa-terminal"></i>
+                <div class="project-info">
+                    <h4>Paradise</h4>
+                    <p>Paradise Steam Library sunucu yönetim ekibinde yer alıyorum. Temel amacımız, en sevdiğiniz oyunları tamamen ücretsiz bir şekilde Steam kütüphanenize erişilebilir hale getirmek.</p>
+                </div>
+            </div>
+            <div class="project-item hover-target" style="--i:6;">
+                <i class="fa-solid fa-code-branch"></i>
+                <div class="project-info">
+                    <h4>Lisium</h4>
+                    <p>Eski Lisium projesinin kurucu ekibindendim. Patrick ile birlikte bu alanda kapsamlı deneyim edindim. Şimdi yoluma Paradise ekibinde devam ediyorum.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">Erişim Logu</div>
+        <div class="stats-container hover-target">
+            <div class="stat-text">
+                <i class="fa-solid fa-eye"></i> ZİYARETÇİ
+            </div>
+            <img src="https://profile-counter.glitch.me/guestiy_system_1/count.svg" alt="Ziyaretçi Sayısı">
+        </div>
+    </div>
+</div>
+
+<audio id="bgMusic" loop preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/11/22/audio_febc508520.mp3?filename=cyberpunk-125205.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+/* ── CURSOR ── */
+const dot  = document.querySelector('.cursor-dot');
+const ring = document.querySelector('.cursor-ring');
+let mx = innerWidth/2, my = innerHeight/2;
+let rx = mx, ry = my;
+
+if (innerWidth > 768) {
+    document.addEventListener('mousemove', e => {
+        mx = e.clientX; my = e.clientY;
+        dot.style.transform = `translate3d(${mx}px,${my}px,0) translate(-50%,-50%)`;
+    });
+    (function animRing() {
+        rx += (mx - rx) * .18;
+        ry += (my - ry) * .18;
+        ring.style.transform = `translate3d(${rx}px,${ry}px,0) translate(-50%,-50%)`;
+        requestAnimationFrame(animRing);
+    })();
+    document.querySelectorAll('.hover-target').forEach(el => {
+        el.addEventListener('mouseenter', () => document.body.classList.add('hovering'));
+        el.addEventListener('mouseleave', () => document.body.classList.remove('hovering'));
+    });
+}
+
+/* ── 3D TILT ── */
+const card = document.getElementById('tilt-card');
+document.addEventListener('mousemove', e => {
+    if (innerWidth <= 450) return;
+    const xAxis = (innerWidth/2  - e.clientX) / 45;
+    const yAxis = (innerHeight/2 - e.clientY) / 45;
+    card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+});
+document.addEventListener('mouseleave', () => {
+    if (innerWidth > 450) card.style.transform = '';
+});
+
+/* ── MATRIX ── */
+const canvas = document.getElementById('matrix-canvas');
+const ctx    = canvas.getContext('2d');
+const resize = () => { canvas.width = innerWidth; canvas.height = innerHeight; };
+resize();
+window.addEventListener('resize', resize);
+
+const chars   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%^&*()_+-=[]{}|;:<>?./\\';
+const fSize   = 13;
+let cols      = Math.floor(canvas.width / fSize);
+let drops     = Array(cols).fill(1);
+
+setInterval(() => {
+    cols = Math.floor(canvas.width / fSize);
+    if (drops.length !== cols) drops = Array(cols).fill(1);
+
+    ctx.fillStyle = 'rgba(0,0,0,.055)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = fSize + 'px monospace';
+
+    drops.forEach((y, i) => {
+        const bright = Math.random() > 0.95;
+        ctx.fillStyle = bright ? '#afffca' : '#00ff41';
+        ctx.globalAlpha = bright ? .9 : (.3 + Math.random() * .5);
+        ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fSize, y * fSize);
+        ctx.globalAlpha = 1;
+        if (y * fSize > canvas.height && Math.random() > .975) drops[i] = 0;
+        drops[i]++;
+    });
+}, 35);
+
+/* ── MUSIC ── */
+const audio = document.getElementById('bgMusic');
+const hint  = document.getElementById('playHint');
+let started = false;
+audio.volume = 0;
+
+document.body.addEventListener('click', () => {
+    if (started) return;
+    audio.play().catch(() => {});
+    started = true;
+    hint.style.opacity = '0';
+    hint.style.transition = 'opacity .5s';
+    setTimeout(() => hint.style.display = 'none', 600);
+    const fade = setInterval(() => {
+        if (audio.volume < 0.38) audio.volume = Math.min(.38, audio.volume + .04);
+        else clearInterval(fade);
+    }, 180);
+});
+
+/* ── PROTECTION ── */
+(function() {
+    console.log('%c Error404Found :)', 'color:#00ff41;font-size:28px;font-weight:bold;text-shadow:0 0 10px #00ff41;');
+
+    function block() {
+        document.body.innerHTML = `
+            <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;
+                        height:100vh;background:#000;font-family:monospace;text-align:center;gap:16px;">
+                <p style="color:#00ff41;font-size:14px;letter-spacing:3px;">ACCESS DENIED</p>
+                <h1 style="color:#fff;font-size:36px;">Error 404</h1>
+                <p style="color:#555;font-size:12px;">// made by guestiyy</p>
+            </div>`;
+        document.body.style.background = '#000';
+        setTimeout(() => { while(true) console.log('Erişim Reddedildi!'); }, 80);
+    }
+
+    document.addEventListener('keydown', e => {
+        const c = e.ctrlKey || e.metaKey;
+        if (e.key === 'F12' ||
+            (c && ['u','U','s','S','p','P'].includes(e.key)) ||
+            (c && e.shiftKey && ['i','I','j','J','c','C'].includes(e.key))) {
+            e.preventDefault(); block();
+        }
+    });
+
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    ['selectstart','copy','cut','dragstart'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
+
+    setInterval(() => {
+        if (outerWidth - innerWidth > 160 || outerHeight - innerHeight > 160) block();
+    }, 1500);
+})();
+// made by guestiyy
+</script>
+</body>
+</html>
