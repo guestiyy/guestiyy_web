@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Kurumsal Güvenlik Portalı" />
+    <title>Koruma - Sistemi</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        :root {
+            --bg-color: #010103;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.4);
+            --glass-bg: rgba(8, 8, 10, 0.88);
+            --glass-border: rgba(255, 255, 255, 0.03);
+            --accent-glow: rgba(255, 255, 255, 0.04);
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        
+        .body-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background: #020204;
+            overflow: hidden;
+        }
+
+        .bg-mesh {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(8, 8, 14, 1) 0, transparent 40%),
+                radial-gradient(at 100% 100%, rgba(12, 12, 18, 0.8) 0, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(4, 4, 8, 1) 0, transparent 60%);
+            opacity: 0.99;
+        }
+
+        
+        #security-gateway {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            background: rgba(1, 1, 2, 0.94);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            transition: opacity var(--transition), visibility var(--transition);
+        }
+
+        #matrix-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 1; 
+            pointer-events: none;
+            opacity: 0.45; 
+        }
+
+        .glass-card {
+            position: relative;
+            z-index: 2; 
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 24px;
+            box-shadow: 0 60px 140px rgba(0, 0, 0, 0.98), inset 0 1px 0 rgba(255, 255, 255, 0.01);
+            padding: 4rem 3rem;
+            width: 92%;
+            max-width: 440px;
+            text-align: center;
+        }
+
+        .brand-badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.45em;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        h2.card-title {
+            font-size: 1.55rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.6rem;
+            background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.card-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            margin-bottom: 2.5rem;
+            font-weight: 400;
+            line-height: 1.5;
+        }
+
+        
+        .widget-zone {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 1.15rem 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .widget-zone:hover {
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .widget-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .trigger-ring {
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .widget-zone:hover .trigger-ring {
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .micro-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            display: none;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .check-icon {
+            font-size: 0.8rem;
+            color: var(--success-color);
+            display: none;
+            opacity: 0;
+            transform: scale(0.6);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .widget-text {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 500;
+        }
+
+        
+        .widget-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            line-height: 1;
+            opacity: 0.35;
+            transition: var(--transition);
+        }
+
+        .widget-zone:hover .widget-right { opacity: 0.6; }
+        .widget-right i { font-size: 1.05rem; color: #ffffff; }
+        .widget-right span { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; color: #ffffff; }
+
+        .widget-zone.processing { pointer-events: none; }
+        .widget-zone.verified { pointer-events: none; background: rgba(16, 185, 129, 0.01); border-color: rgba(16, 185, 129, 0.15); }
+        .widget-zone.blocked { pointer-events: none; background: rgba(239, 68, 68, 0.02); border-color: rgba(239, 68, 68, 0.3); }
+
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div class="body-bg">
+        <div class="bg-mesh"></div>
+    </div>
+
+    <div id="security-gateway">
+        <canvas id="matrix-canvas"></canvas>
+        
+        <div class="glass-card">
+            <div class="brand-badge">Güvenlik</div>
+            <h2 class="card-title">Kimlik Doğrulama</h2>
+            <p class="card-subtitle">Siteye Devam etmek için insan olduğunuzu doğrulayın.</p>
+            
+            <div class="widget-zone" id="authWidget" onclick="triggerHardwareCoreVerification(event)">
+                <div class="widget-left">
+                    <div class="trigger-ring" id="ring">
+                        <div class="micro-spinner" id="spinner"></div>
+                        <i class="fa-solid fa-check check-icon" id="check"></i>
+                    </div>
+                    <span class="widget-text" id="widgetLabel">Ben robot değilim</span>
+                </div>
+                <div class="widget-right">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>v2</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let loadTimestamp = Date.now();
+
+        
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "F12" || (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C")) || (e.ctrlKey && e.key === "U")) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        
+        const canvas = document.getElementById("matrix-canvas");
+        const ctx = canvas.getContext("2d");
+        let items = [];
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", initCanvas);
+        initCanvas();
+
+        
+        for (let i = 0; i < 25; i++) {
+            items.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 5 + 12, 
+                baseOpacity: Math.random() * 0.2 + 0.25, 
+                pulseTime: Math.random() * 100, 
+                pulseSpeed: Math.random() * 0.03 + 0.015, 
+                speedY: Math.random() * 0.14 + 0.06, 
+                speedX: Math.random() * 0.04 - 0.02
+            });
+        }
+
+        
+        function drawVectorLock(ctx, x, y, size, opacity) {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.15})`;
+            ctx.lineWidth = 1.6;
+
+            
+            ctx.beginPath();
+            ctx.rect(x - size / 2, y, size, size * 0.8);
+            ctx.fill();
+            ctx.stroke();
+
+            
+            ctx.beginPath();
+            ctx.arc(x, y, size / 3, Math.PI, 0);
+            ctx.stroke();
+
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(x, y + (size * 0.35), 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function runMatrixEngine() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            items.forEach(item => {
+                
+                item.pulseTime += item.pulseSpeed;
+                let dynamicOpacity = item.baseOpacity + Math.sin(item.pulseTime) * 0.12;
+                
+                
+                if (dynamicOpacity < 0.05) dynamicOpacity = 0.05;
+                if (dynamicOpacity > 0.6) dynamicOpacity = 0.6;
+
+                drawVectorLock(ctx, item.x, item.y, item.size, dynamicOpacity);
+                
+                
+                item.y += item.speedY;
+                item.x += item.speedX;
+
+                
+                if (item.y > canvas.height) {
+                    item.y = -25;
+                    item.x = Math.random() * canvas.width;
+                }
+                if (item.x > canvas.width) item.x = 0;
+                if (item.x < 0) item.x = canvas.width;
+            });
+
+            requestAnimationFrame(runMatrixEngine);
+        }
+        runMatrixEngine();
+
+        
+        function triggerHardwareCoreVerification(event) {
+            const widget = document.getElementById('authWidget');
+            const ring = document.getElementById('ring');
+            const spinner = document.getElementById('spinner');
+            const check = document.getElementById('check');
+            const label = document.getElementById('widgetLabel');
+
+            widget.classList.add('processing');
+            ring.style.borderColor = "transparent";
+            spinner.style.display = "block";
+            label.innerText = "Kontrol Ediliyor...";
+
+            let riskScore = 0;
+
+            
+            if (event && !event.isTrusted) riskScore += 5; 
+            if (navigator.webdriver) riskScore += 5; 
+            if (navigator.plugins && navigator.plugins.length === 0) riskScore += 2; 
+            if ((navigator.hardwareConcurrency || 0) < 1) riskScore += 3; 
+            if ((Date.now() - loadTimestamp) < 420) riskScore += 4; 
+            if (!navigator.languages || navigator.languages.length === 0) riskScore += 3; 
+
+            setTimeout(() => {
+                if (riskScore < 2) {
+                    
+                    spinner.style.display = "none";
+                    check.style.display = "block";
+                    setTimeout(() => {
+                        check.style.opacity = "1";
+                        check.style.transform = "scale(1)";
+                    }, 50);
+                    
+                    widget.classList.remove('processing');
+                    widget.classList.add('verified');
+                    label.innerText = "Doğrulandı";
+                    label.style.color = "var(--success-color)";
+
+                    
+                    setTimeout(grantAccess, 800);
+                } else {
+                    
+                    spinner.style.display = "none";
+                    ring.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color: var(--error-color);"></i>';
+                    widget.classList.remove('processing');
+                    widget.classList.add('blocked');
+                    label.innerText = "Erişim Reddedildi (403)";
+                    label.style.color = "var(--error-color)";
+                    
+                    console.error("Shield Security: Malicious intent or automation detected.");
+                }
+            }, 1400);
+        }
+
+        
+        function grantAccess() {
+            const gateway = document.getElementById('security-gateway');
+
+            if (gateway) {
+                gateway.style.opacity = '0';
+                setTimeout(() => {
+                    gateway.style.display = 'none';
+                    
+                    window.location.href = "https://guestiyy.github.io";
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>
